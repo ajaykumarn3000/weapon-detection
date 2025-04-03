@@ -34,6 +34,9 @@ def update_subscribers() -> List:
             lambda update: update["message"]["text"] == "/start", messages
         )
     ]
+    if not os.path.exists(SUBSCRIBERS_FILE):
+        with open(SUBSCRIBERS_FILE, "wb") as file:
+            pickle.dump(list(), file)
     with open(SUBSCRIBERS_FILE, "rb") as file:
         old_subscribers: List[int] = pickle.load(file)
         new_subscribers: List[int] = list(
@@ -96,6 +99,7 @@ def send_video(video: str, spoiler: bool = True) -> None:
 
 
 def main() -> None:
+    update_subscribers()
     print("1 - Send message")
     print("2 - Send video")
     option: int = int(input("Enter an option: "))
