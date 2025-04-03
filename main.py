@@ -1,7 +1,11 @@
-import cv2
 import time
 from collections import deque
+
+import cv2
+import schedule
 from ultralytics import YOLO
+
+from telegram_bot import send_message, send_video, update_subscribers
 
 # CONFIGURABLE PARAMETERS
 DETECTION_CLASS_NAME = "weapon"  # Match your model's class label
@@ -12,7 +16,12 @@ FRAME_WIDTH, FRAME_HEIGHT = 1080, 720
 FPS = 10  # Approximate FPS
 
 # Input source
-camera = input("Enter camera URL (eg: http://192.168.1.1:8080/video) \n(or leave blank for webcam): ") or 0
+camera = (
+    input(
+        "Enter camera URL (eg: http://192.168.1.1:8080/video) \n(or leave blank for webcam): "
+    )
+    or 0
+)
 cap = cv2.VideoCapture(camera)
 
 # Load YOLO model
@@ -35,7 +44,7 @@ video_writer = None
 
 # Start recording
 def start_recording():
-    global video_writer, recording, record_start_time
+    global video_writer, recording, record_start_time, filename
     fourcc = cv2.VideoWriter_fourcc(*"avc1")
     record_start_time = time.strftime("%Y%m%d-%H%M%S")
     filename = f"weapon_detected_{record_start_time}.mp4"
@@ -43,21 +52,26 @@ def start_recording():
     for buffered_frame in frame_buffer:
         video_writer.write(buffered_frame)
     recording = True
-    print("🚨 ALERT: Weapon detected! Started recording.")
+    message = "🚨 ALERT: Weapon detected! Started recording."
+    print(message)
+    send_message(message)
 
 
 # Stop recording
 def stop_recording():
-    global video_writer, recording
+    global video_writer, recording, filename
     if video_writer:
         video_writer.release()
         video_writer = None
         print("✅ Saved video and stopped recording.")
+        send_video(filename)  # Assuming the file is written to at this point
     recording = False
 
 
+schedule.every().minute.do(update_subscribers)
 # Main loop
 while True:
+    schedule.run_pending()
     ret, frame = cap.read()
     if not ret:
         break
@@ -67,7 +81,6 @@ while True:
 
     results = model(frame, stream=True, conf=0.5)
 
-    
     weapon_detected = False
 
     for result in results:
@@ -88,9 +101,8 @@ while True:
                 (0, 255, 0),
                 2,
             )
-            
-            weapon_detected = True
 
+            weapon_detected = True
 
     current_time = time.time()
 
